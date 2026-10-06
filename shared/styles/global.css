@@ -14,11 +14,3 @@ body {
   background: var(--mantine-color-body);
   color: var(--mantine-color-text);
 }
-#root {
-  padding: 24px;
-}
-@media (max-width: 48em) {
-  #root {
-    padding: 16px;
-  }
-}
