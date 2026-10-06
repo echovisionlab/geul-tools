@@ -33,7 +33,12 @@ export function HwpEditorView({
   return (
     <Box
       className={classes.editor}
-      style={{ "--hwp-editor-height": `${contentHeight}px` } as CSSProperties}
+      style={
+        {
+          "--hwp-editor-height":
+            contentHeight > 0 ? `${contentHeight}px` : undefined,
+        } as CSSProperties
+      }
       aria-label={labels.label}
       aria-busy={status === "loading"}
     >
