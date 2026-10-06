@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/echovisionlab/geul-tools/compare/v0.3.0...v0.3.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* **portadj:** update SDK for version label font ([00ef0d7](https://github.com/echovisionlab/geul-tools/commit/00ef0d73f85f2a246186e46238943de2c6c036d5))
+* **portadj:** use SDK v0.1.5 for version label font ([d81c446](https://github.com/echovisionlab/geul-tools/commit/d81c446d3502462ebced6c8e4aa24bfb80364f43))
+
 ## [0.3.0](https://github.com/echovisionlab/geul-tools/compare/v0.2.1...v0.3.0) (2026-10-06)
 
 
