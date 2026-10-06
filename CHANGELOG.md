@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/echovisionlab/geul-tools/compare/v0.2.0...v0.2.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* **audio:** remove section content padding ([bfe6f45](https://github.com/echovisionlab/geul-tools/commit/bfe6f458d2b9d62a3734e661bfb041a25ff84e65))
+* **audio:** remove section content padding ([759dec8](https://github.com/echovisionlab/geul-tools/commit/759dec8cc451fc63c76f79bf0743ce792d2eeba4))
+
 ## [0.2.0](https://github.com/echovisionlab/geul-tools/compare/v0.1.3...v0.2.0) (2026-10-06)
 
 
