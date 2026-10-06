@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0](https://github.com/echovisionlab/geul-tools/compare/v0.1.3...v0.2.0) (2026-10-06)
+
+
+### Features
+
+* **embed:** mount tool modules with site fonts ([#11](https://github.com/echovisionlab/geul-tools/issues/11)) ([ec8bb05](https://github.com/echovisionlab/geul-tools/commit/ec8bb05506560d05872aa66df405d9ea3221efd3))
+
+
+### Bug Fixes
+
+* **styles:** remove outer spacing from embedded tools ([c6810e8](https://github.com/echovisionlab/geul-tools/commit/c6810e8c9a8dcf99b4f15159642a12cb90e348f9))
+* **styles:** remove outer spacing from embedded tools ([b782224](https://github.com/echovisionlab/geul-tools/commit/b782224c6cc6e54c151b9c276309727a8fa55a27))
+
 ## [0.1.3](https://github.com/echovisionlab/geul-tools/compare/v0.1.2...v0.1.3) (2026-10-06)
 
 
