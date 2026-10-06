@@ -23,6 +23,7 @@ html[data-font-profile="arabic"] {
   --font-family-sans: "Noto Sans Arabic", "Noto Sans", "Noto Color Emoji";
 }
 
-body {
+body,
+:host {
   font-family: var(--font-family-sans), sans-serif;
 }

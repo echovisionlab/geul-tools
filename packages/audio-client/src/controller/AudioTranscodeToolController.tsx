@@ -48,6 +48,8 @@ export interface AudioTranscodeToolProps {
   /** Resolved consumer-owned HTTP input. Undefined keeps the local file-picker mode. */
   externalSource?:
     (AudioTranscoderInputSource & { readonly id: string }) | null;
+  /** Exact trusted origin for an external source's native download endpoint. */
+  apiOrigin?: string;
   /** Consumer-specific initial output format; defaults to WAV when omitted. */
   initialFormat?: string;
   /** Null embeds the converter below another feature heading. */
@@ -58,6 +60,7 @@ export interface AudioTranscodeToolProps {
 export function AudioTranscodeToolController({
   runtimeFactory = createAudioTranscoderRuntime,
   externalSource,
+  apiOrigin,
   initialFormat = DEFAULT_AUDIO_TRANSCODE_FORMAT,
   title,
   onExternalSourceRemove,
@@ -623,6 +626,7 @@ export function AudioTranscodeToolController({
           row.source.downloadUrl,
           row.source.name,
           controller.signal,
+          apiOrigin,
         );
         if (result !== "started") {
           setCapacityError(
@@ -643,7 +647,7 @@ export function AudioTranscodeToolController({
         }
       }
     },
-    [t],
+    [apiOrigin, t],
   );
   const canConvertAll =
     !busy &&

@@ -48,13 +48,16 @@ export function configuredParentOrigins(
     ),
   ];
 }
-export function runtimeConfigScript({
+export function runtimeConfig({
   tool,
   parentOrigins,
   fontCdnOrigin = process.env.FONT_CDN_ORIGIN ?? "https://cdn.dsub.io",
   apiOrigin = process.env.PUBLIC_API_ORIGIN,
 }) {
-  return `window.__GEUL_TOOL_CONFIG__=${JSON.stringify({ tool, parentOrigins, fontCdnOrigin, apiOrigin }).replace(/</g, "\\u003c")};\n`;
+  return { tool, parentOrigins, fontCdnOrigin, apiOrigin };
+}
+export function runtimeConfigScript(options) {
+  return `window.__GEUL_TOOL_CONFIG__=${JSON.stringify(runtimeConfig(options)).replace(/</g, "\\u003c")};\n`;
 }
 export function securityHeaders(parentOrigins) {
   return {
@@ -106,6 +109,18 @@ export async function staticResponse(request, { dist, tool, parentOrigins }) {
         },
       },
     );
+  if (url.pathname === "/runtime-config.json")
+    return new Response(
+      request.method === "HEAD"
+        ? null
+        : JSON.stringify(runtimeConfig({ tool, parentOrigins })),
+      {
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      },
+    );
   let pathname;
   try {
     pathname = decodeURIComponent(url.pathname);
@@ -113,6 +128,7 @@ export async function staticResponse(request, { dist, tool, parentOrigins }) {
     return new Response("Bad path\n", { status: 400 });
   }
   if (
+    extname(pathname) === ".map" ||
     pathname.includes("\0") ||
     pathname.includes("\\") ||
     pathname.split("/").includes("..")
@@ -175,6 +191,60 @@ export async function staticResponse(request, { dist, tool, parentOrigins }) {
 const youtubeApiPrefix = "/api/tools/youtube-audio";
 const apiMethods = ["GET", "HEAD", "POST", "DELETE"];
 const apiRequestHeaders = ["content-type", "range"];
+
+export function staticOriginPolicy(request, { toolOrigin, parentOrigins }) {
+  const url = new URL(request.url);
+  if (
+    url.pathname === "/" ||
+    url.pathname === "/healthz" ||
+    url.pathname.startsWith("/api/") ||
+    extname(url.pathname) === ".html"
+  )
+    return null;
+  const origin = request.headers.get("origin");
+  const allowed =
+    origin !== null &&
+    [toolOrigin ?? url.origin, ...parentOrigins].includes(origin);
+  const headers = { Vary: "Origin" };
+  if (origin !== null && !allowed)
+    return {
+      response: new Response("Forbidden origin\n", {
+        status: 403,
+        headers: { ...headers, "Cache-Control": "no-store" },
+      }),
+      headers,
+    };
+  if (allowed) {
+    headers["Access-Control-Allow-Origin"] = origin;
+    headers["Access-Control-Expose-Headers"] =
+      "Content-Type, Content-Length, Content-Range, Accept-Ranges";
+  }
+  if (request.method === "OPTIONS") {
+    const method = request.headers.get("access-control-request-method");
+    const requestedHeaders = (
+      request.headers.get("access-control-request-headers") ?? ""
+    )
+      .split(",")
+      .map((header) => header.trim().toLowerCase())
+      .filter(Boolean);
+    if (
+      !allowed ||
+      !["GET", "HEAD"].includes(method) ||
+      requestedHeaders.some((header) => header !== "range")
+    )
+      return { response: new Response(null, { status: 403 }), headers };
+    return {
+      response: new Response(null, { status: 204 }),
+      headers: {
+        ...headers,
+        "Access-Control-Allow-Methods": "GET, HEAD",
+        "Access-Control-Allow-Headers": "Range",
+        "Cache-Control": "no-store",
+      },
+    };
+  }
+  return { response: null, headers };
+}
 
 export function apiOriginPolicy(request, { tool, toolOrigin, parentOrigins }) {
   const pathname = new URL(request.url).pathname;
@@ -262,11 +332,14 @@ export function createToolServer({
             : {}),
         },
       );
-      originPolicy = apiOriginPolicy(request, {
+      const policyOptions = {
         tool,
         toolOrigin,
         parentOrigins,
-      });
+      };
+      originPolicy =
+        apiOriginPolicy(request, policyOptions) ??
+        staticOriginPolicy(request, policyOptions);
       const response =
         originPolicy?.response ??
         (apiHandler ? await apiHandler(request, { authenticate }) : null) ??

@@ -5,7 +5,6 @@ import { downloadOriginalAudio } from "./download-original-audio";
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  delete (window as Partial<Window>).__GEUL_TOOL_CONFIG__;
 });
 
 describe("original audio download", () => {
@@ -37,11 +36,6 @@ describe("original audio download", () => {
   });
 
   it("downloads from the exact configured API origin with session cookies", async () => {
-    window.__GEUL_TOOL_CONFIG__ = {
-      tool: "youtube-audio",
-      parentOrigins: [],
-      apiOrigin: "https://www.dsub.io",
-    };
     const fetcher = vi.fn().mockResolvedValue(new Response(null));
     vi.stubGlobal("fetch", fetcher);
     const source =
@@ -55,7 +49,12 @@ describe("original audio download", () => {
       });
     const signal = new AbortController().signal;
     await expect(
-      downloadOriginalAudio(source, "audio.webm", signal),
+      downloadOriginalAudio(
+        source,
+        "audio.webm",
+        signal,
+        "https://www.dsub.io",
+      ),
     ).resolves.toBe("started");
     expect(fetcher).toHaveBeenCalledExactlyOnceWith(source, {
       method: "HEAD",
@@ -74,18 +73,18 @@ describe("original audio download", () => {
   ])(
     "rejects an origin other than the configured API origin: %s",
     async (url) => {
-      window.__GEUL_TOOL_CONFIG__ = {
-        tool: "youtube-audio",
-        parentOrigins: [],
-        apiOrigin: "https://www.dsub.io",
-      };
       const fetcher = vi.fn();
       vi.stubGlobal("fetch", fetcher);
       const click = vi
         .spyOn(HTMLAnchorElement.prototype, "click")
         .mockImplementation(() => {});
       await expect(
-        downloadOriginalAudio(url, "audio.webm", new AbortController().signal),
+        downloadOriginalAudio(
+          url,
+          "audio.webm",
+          new AbortController().signal,
+          "https://www.dsub.io",
+        ),
       ).resolves.toBe("failed");
       expect(fetcher).not.toHaveBeenCalled();
       expect(click).not.toHaveBeenCalled();

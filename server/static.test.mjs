@@ -12,6 +12,13 @@ await mkdir(".artifacts", { recursive: true });
 const directory = await mkdtemp(resolve(".artifacts", "http-test-"));
 const dist = resolve(directory, "dist");
 await mkdir(resolve(dist, "assets"), { recursive: true });
+await mkdir(resolve(dist, "embed"), { recursive: true });
+await writeFile(resolve(dist, "embed/index.js"), "export const mount=()=>{};");
+await writeFile(resolve(dist, "embed/style.css"), ":host{display:block}");
+await writeFile(
+  resolve(dist, "embed/index.js.map"),
+  '{"sourcesContent":["private source"]}',
+);
 await writeFile(resolve(dist, "index.html"), "<h1>Tool</h1>");
 await writeFile(
   resolve(dist, "assets/main-Abc12345.js"),
@@ -60,6 +67,151 @@ test("serves isolated index/config with matching framing policy and no secrets",
     /"tool":"transcode","parentOrigins":\["https:\/\/www.dsub.io","https:\/\/preview.dsub.io"\]/,
   );
   assert.equal((await fetch(`${origin}/healthz`)).status, 200);
+});
+test("serves equivalent runtime JSON and stable module entries without persistent caching", async () => {
+  const config = await fetch(`${origin}/runtime-config.json`, {
+    headers: { Origin: parentOrigins[0] },
+  });
+  assert.equal(config.status, 200);
+  assert.equal(
+    config.headers.get("content-type"),
+    "application/json; charset=utf-8",
+  );
+  assert.equal(config.headers.get("cache-control"), "no-store");
+  const expected = JSON.parse(
+    runtimeConfigScript({ tool: "transcode", parentOrigins })
+      .replace(/^window\.__GEUL_TOOL_CONFIG__=/, "")
+      .trim()
+      .replace(/;$/, ""),
+  );
+  assert.deepEqual(await config.json(), expected);
+  for (const path of [
+    "/embed/index.js",
+    "/embed/style.css",
+    "/runtime-config.json",
+  ]) {
+    const head = await fetch(`${origin}${path}`, {
+      method: "HEAD",
+      headers: { Origin: parentOrigins[0] },
+    });
+    assert.equal(head.status, 200);
+    assert.equal(head.headers.get("cache-control"), "no-store");
+    assert.equal(await head.text(), "");
+  }
+  assert.equal((await fetch(`${origin}/embed/index.js.map`)).status, 404);
+});
+test("static modules, CSS, runtime JSON and WASM allow exact trusted origins without credentials", async () => {
+  for (const path of [
+    "/embed/index.js",
+    "/embed/style.css",
+    "/runtime-config.json",
+    "/runtime.wasm",
+    "/assets/main-Abc12345.js",
+  ]) {
+    for (const requestOrigin of [...parentOrigins, origin]) {
+      const response = await fetch(`${origin}${path}`, {
+        headers: { Origin: requestOrigin },
+      });
+      assert.equal(response.status, 200);
+      assert.equal(
+        response.headers.get("access-control-allow-origin"),
+        requestOrigin,
+      );
+      assert.equal(
+        response.headers.get("access-control-allow-credentials"),
+        null,
+      );
+      assert.equal(response.headers.get("vary"), "Origin");
+    }
+    for (const requestOrigin of [
+      "https://attacker.example",
+      "null",
+      "",
+      "https://www.dsub.io.evil.example",
+      "http://www.dsub.io",
+    ]) {
+      const response = await fetch(`${origin}${path}`, {
+        headers: { Origin: requestOrigin },
+      });
+      assert.equal(response.status, 403);
+      assert.equal(response.headers.get("access-control-allow-origin"), null);
+    }
+    assert.equal((await fetch(`${origin}${path}`)).status, 200);
+  }
+  const range = await fetch(`${origin}/runtime.wasm`, {
+    headers: { Origin: parentOrigins[0], Range: "bytes=2-4" },
+  });
+  assert.equal(range.status, 206);
+  assert.equal(
+    range.headers.get("access-control-allow-origin"),
+    parentOrigins[0],
+  );
+  assert.match(
+    range.headers.get("access-control-expose-headers"),
+    /Content-Range/,
+  );
+  assert.deepEqual(
+    new Uint8Array(await range.arrayBuffer()),
+    Uint8Array.from([115, 109, 1]),
+  );
+  const missing = await fetch(`${origin}/missing.js`, {
+    headers: { Origin: parentOrigins[0] },
+  });
+  assert.equal(missing.status, 404);
+  assert.equal(
+    missing.headers.get("access-control-allow-origin"),
+    parentOrigins[0],
+  );
+});
+test("static preflight only permits trusted read and range requests", async () => {
+  const request = (requestOrigin, method = "GET", headers = "range") =>
+    fetch(`${origin}/runtime.wasm`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: requestOrigin,
+        "Access-Control-Request-Method": method,
+        "Access-Control-Request-Headers": headers,
+      },
+    });
+  const allowed = await request(parentOrigins[0]);
+  assert.equal(allowed.status, 204);
+  assert.equal(
+    allowed.headers.get("access-control-allow-origin"),
+    parentOrigins[0],
+  );
+  assert.equal(allowed.headers.get("access-control-allow-credentials"), null);
+  for (const args of [
+    ["null"],
+    ["https://attacker.example"],
+    [parentOrigins[0], "POST"],
+    [parentOrigins[0], "GET", "authorization"],
+  ])
+    assert.equal((await request(...args)).status, 403);
+});
+test("configured public tool origin is accepted without trusting proxy headers", async () => {
+  const publicOrigin = "https://tools-transcode.dsub.io";
+  const publicServer = createToolServer({
+    tool: "transcode",
+    dist,
+    parentOrigins,
+    toolOrigin: publicOrigin,
+  });
+  await new Promise((done) => publicServer.listen(0, "127.0.0.1", done));
+  try {
+    const address = `http://127.0.0.1:${publicServer.address().port}/embed/index.js`;
+    const own = await fetch(address, { headers: { Origin: publicOrigin } });
+    assert.equal(own.status, 200);
+    assert.equal(own.headers.get("access-control-allow-origin"), publicOrigin);
+    const forged = await fetch(address, {
+      headers: {
+        Origin: "https://attacker.example",
+        "X-Forwarded-Proto": "https",
+      },
+    });
+    assert.equal(forged.status, 403);
+  } finally {
+    await new Promise((done) => publicServer.close(done));
+  }
 });
 test("serves fingerprinted assets, WASM MIME, Range and HEAD", async () => {
   const asset = await fetch(`${origin}/assets/main-Abc12345.js`);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ResolvedYoutubeAudio } from "@echovisionlab/youtube-audio";
 import { useTranslations } from "use-intl";
+import { useToolRuntimeConfig } from "@/shared/client/runtime-context";
 import { AudioTranscodeTool } from "@/audio-client/AudioTranscodeTool";
 import type { AudioTranscoderInputSource } from "@/audio-client/audio-transcoder-runtime";
 import { YoutubeAudioToolView, type YoutubeAudioToolLabels } from "./ui";
@@ -28,8 +29,7 @@ interface YoutubeAudioToolProps {
 
 export function YoutubeAudioTool({ fetcher = fetch }: YoutubeAudioToolProps) {
   const t = useTranslations("tools.youtubeAudio");
-  const apiOrigin =
-    window.__GEUL_TOOL_CONFIG__?.apiOrigin ?? window.location.origin;
+  const apiOrigin = useToolRuntimeConfig()?.apiOrigin ?? window.location.origin;
   const apiBase =
     apiOrigin === window.location.origin
       ? "/api/tools/youtube-audio"
@@ -162,6 +162,7 @@ export function YoutubeAudioTool({ fetcher = fetch }: YoutubeAudioToolProps) {
       converter={
         resolved === null ? null : (
           <AudioTranscodeTool
+            apiOrigin={apiOrigin}
             externalSource={source}
             initialFormat="mp3"
             title={null}

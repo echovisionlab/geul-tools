@@ -61,7 +61,7 @@ describe("AudioTranscodeTool controller", () => {
     const externalSource = {
       id: "source_12345678",
       downloadUrl:
-        "/api/tools/youtube-audio/sources/source_12345678?download=1",
+        "https://www.dsub.io/api/tools/youtube-audio/sources/source_12345678?download=1",
       input: {
         http: {
           credentials: "include" as const,
@@ -79,6 +79,7 @@ describe("AudioTranscodeTool controller", () => {
           <AudioTranscodeTool
             runtimeFactory={harness.runtimeFactory}
             externalSource={externalSource}
+            apiOrigin="https://www.dsub.io"
             initialFormat="mp3"
             title={null}
           />
@@ -106,13 +107,17 @@ describe("AudioTranscodeTool controller", () => {
       sizeLabel: "121 KB",
     });
     expect(viewProps().files[0]?.canDownloadSource).toBe(true);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 410 })),
-    );
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 410 }));
+    vi.stubGlobal("fetch", fetcher);
     await act(async () => {
       await viewProps().onDownloadSource?.(externalSource.id);
     });
+    expect(fetcher).toHaveBeenCalledWith(
+      externalSource.downloadUrl,
+      expect.objectContaining({ method: "HEAD", credentials: "include" }),
+    );
     expect(viewProps().capacityError).toBe(
       enMessages.tools.transcode.sourceDownloadExpired,
     );
