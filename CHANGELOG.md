@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/echovisionlab/geul-tools/compare/v0.1.1...v0.1.2) (2026-10-06)
+
+
+### Bug Fixes
+
+* **youtube-audio:** load sources without iframe form permission ([#5](https://github.com/echovisionlab/geul-tools/issues/5)) ([bd593fa](https://github.com/echovisionlab/geul-tools/commit/bd593fae5a32a691435b3bcfcb7184d5a7c594d7))
+
 ## [0.1.1](https://github.com/echovisionlab/geul-tools/compare/v0.1.0...v0.1.1) (2026-10-06)
 
 
