@@ -1,0 +1,20 @@
+.root[data-emphasis="low"],
+.root[data-emphasis="low"]:hover,
+.root[data-emphasis="low"]:focus,
+.root[data-emphasis="low"]:focus-visible,
+.root[data-emphasis="low"]:active,
+.root[data-emphasis="low"]:disabled,
+.root[data-emphasis="low"][data-disabled] {
+  background: transparent !important;
+}
+
+.root[data-emphasis="low"]:disabled,
+.root[data-emphasis="low"][data-disabled] {
+  color: var(--mantine-color-disabled-color) !important;
+  opacity: 1;
+}
+
+.root[data-emphasis="low"]:disabled > *,
+.root[data-emphasis="low"][data-disabled] > * {
+  opacity: 0.6;
+}

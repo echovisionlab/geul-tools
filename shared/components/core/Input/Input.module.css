@@ -1,0 +1,35 @@
+.input {
+  border: 0 !important;
+  border-top: 0 !important;
+  border-right: 0 !important;
+  border-left: 0 !important;
+  border-bottom: 1px solid var(--mantine-color-default-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  position: relative;
+}
+
+.input:focus,
+.input:focus-within {
+  box-shadow: none !important;
+}
+
+.wrapper {
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--mantine-primary-color-filled);
+    transition: width 0.3s ease-out;
+  }
+
+  &:focus-within::after {
+    width: 100%;
+  }
+}

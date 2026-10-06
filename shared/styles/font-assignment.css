@@ -1,0 +1,28 @@
+:root {
+  --font-family-sans: "Noto Sans", "Noto Color Emoji";
+  --font-mono: "Noto Sans Mono", "Noto Color Emoji", monospace;
+}
+
+html[data-font-profile="korean"] {
+  --font-family-sans: "Noto Sans KR", "Noto Sans", "Noto Color Emoji";
+}
+
+html[data-font-profile="japanese"] {
+  --font-family-sans: "Noto Sans JP", "Noto Sans", "Noto Color Emoji";
+}
+
+html[data-font-profile="chinese-simplified"] {
+  --font-family-sans: "Noto Sans SC", "Noto Sans", "Noto Color Emoji";
+}
+
+html[data-font-profile="chinese-traditional"] {
+  --font-family-sans: "Noto Sans TC", "Noto Sans", "Noto Color Emoji";
+}
+
+html[data-font-profile="arabic"] {
+  --font-family-sans: "Noto Sans Arabic", "Noto Sans", "Noto Color Emoji";
+}
+
+body {
+  font-family: var(--font-family-sans), sans-serif;
+}

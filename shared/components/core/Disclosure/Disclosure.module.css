@@ -1,0 +1,25 @@
+.root[data-shape="square"] .item,
+.root[data-shape="square"] .control {
+  border-radius: 0;
+}
+
+.root[data-density="compact"] .control {
+  min-height: var(--chrome-row-height);
+  padding: 0 8px;
+  font-size: var(--chrome-font-size);
+}
+
+.root[data-density="compact"] .label {
+  padding: 4px 0;
+  font-size: var(--chrome-font-size);
+  line-height: 1.25;
+}
+
+.root[data-density="compact"] .chevron {
+  width: var(--chrome-icon-size);
+  height: var(--chrome-icon-size);
+}
+
+.root[data-density="compact"][data-content-indent="small"] .content {
+  padding: 2px 0 4px 8px;
+}
