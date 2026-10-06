@@ -59,29 +59,96 @@ function render(props: Partial<YoutubeAudioToolViewProps> = {}) {
 }
 
 describe("YoutubeAudioToolView", () => {
-  it("uses the Core URL field and submits only a non-empty source", () => {
-    render();
+  it("loads a non-empty source by clicking an ordinary button without a form", () => {
+    render({ url: "https://youtu.be/abcdefghijk" });
     expect(container.querySelector("h1")?.textContent).toBe(
       baseProps.labels.title,
     );
     expect(container.textContent).toContain(baseProps.labels.description);
-    const input =
-      container.querySelector<HTMLInputElement>('input[type="url"]');
-    const form = container.querySelector("form");
-    const submit = container.querySelector<HTMLButtonElement>(
-      'button[type="submit"]',
-    );
-    expect(input?.placeholder).toBe("https://…");
-    expect(submit?.disabled).toBe(true);
-
-    render({ url: "https://youtu.be/abcdefghijk" });
-    act(() =>
-      form?.dispatchEvent(
-        new Event("submit", { bubbles: true, cancelable: true }),
-      ),
-    );
+    expect(
+      container.querySelector<HTMLInputElement>('input[type="url"]')
+        ?.placeholder,
+    ).toBe("https://…");
+    expect(container.querySelector("form")).toBeNull();
+    const load = container.querySelector<HTMLButtonElement>("button")!;
+    expect(load.type).toBe("button");
+    expect(load.disabled).toBe(false);
+    act(() => load.click());
     expect(handlers.onResolve).toHaveBeenCalledOnce();
   });
+
+  it("loads once on Enter in the URL input without native form submission", () => {
+    render({ url: "https://youtu.be/abcdefghijk" });
+    const enter = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => container.querySelector("input")!.dispatchEvent(enter));
+    expect(enter.defaultPrevented).toBe(true);
+    expect(handlers.onResolve).toHaveBeenCalledOnce();
+  });
+
+  it.each(["", "   "])(
+    "does not load an empty URL %j by click or Enter",
+    (url) => {
+      render({ url });
+      const load = container.querySelector<HTMLButtonElement>("button")!;
+      expect(load.disabled).toBe(true);
+      act(() => {
+        load.click();
+        container.querySelector("input")!.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "Enter",
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      });
+      expect(handlers.onResolve).not.toHaveBeenCalled();
+    },
+  );
+
+  it("blocks another click or Enter while a source is loading", () => {
+    render({ url: "https://youtu.be/abcdefghijk", resolving: true });
+    const input = container.querySelector<HTMLInputElement>("input")!;
+    const load = container.querySelector<HTMLButtonElement>("button")!;
+    expect(input.disabled).toBe(true);
+    expect(load.disabled).toBe(true);
+    expect(load.textContent).toContain(baseProps.labels.resolving);
+    act(() => {
+      load.click();
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    expect(handlers.onResolve).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { key: "Enter", isComposing: true },
+    { key: "Enter", repeat: true },
+    { key: "Escape" },
+  ])(
+    "ignores IME confirmation, repeated Enter and other keys: %j",
+    (options) => {
+      render({ url: "https://youtu.be/abcdefghijk" });
+      act(() =>
+        container.querySelector("input")!.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            ...options,
+            bubbles: true,
+            cancelable: true,
+          }),
+        ),
+      );
+      expect(handlers.onResolve).not.toHaveBeenCalled();
+    },
+  );
 
   it("renders source status, converter content, clear action, and a field error", () => {
     render({

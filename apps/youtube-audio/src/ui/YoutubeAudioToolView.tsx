@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ReactNode, type SubmitEvent } from "react";
+import { useId, type ReactNode } from "react";
 import { Group, Stack } from "@mantine/core";
 import { Alert } from "@/components/core/Alert";
 import { Button } from "@/components/core/Button";
@@ -43,57 +43,59 @@ export function YoutubeAudioToolView({
 }: YoutubeAudioToolViewProps) {
   const urlId = useId();
 
-  const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    onResolve();
-  };
-
   return (
     <Stack gap="xl" data-youtube-audio-tool>
       <PageHeader title={labels.title} description={labels.description} />
 
-      <form onSubmit={handleSubmit}>
-        <Stack gap="md">
-          <Field label={labels.urlLabel} htmlFor={urlId} error={error} required>
-            <TextInput
-              id={urlId}
-              type="url"
-              inputMode="url"
-              autoComplete="url"
-              placeholder={labels.urlPlaceholder}
-              value={url}
-              disabled={resolving}
-              onChange={(event) => onUrlChange(event.currentTarget.value)}
-            />
-          </Field>
+      <Stack gap="md">
+        <Field label={labels.urlLabel} htmlFor={urlId} error={error} required>
+          <TextInput
+            id={urlId}
+            type="url"
+            inputMode="url"
+            autoComplete="url"
+            placeholder={labels.urlPlaceholder}
+            value={url}
+            disabled={resolving}
+            onChange={(event) => onUrlChange(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (
+                event.key !== "Enter" ||
+                event.nativeEvent.isComposing ||
+                event.repeat
+              )
+                return;
+              event.preventDefault();
+              if (!resolving && url.trim().length > 0) onResolve();
+            }}
+          />
+        </Field>
+        {resolvedTitle ? <Alert tone="positive">{resolvedTitle}</Alert> : null}
+        <Group justify="flex-end" gap="xs">
           {resolvedTitle ? (
-            <Alert tone="positive">{resolvedTitle}</Alert>
-          ) : null}
-          <Group justify="flex-end" gap="xs">
-            {resolvedTitle ? (
-              <Button
-                type="button"
-                size="xs"
-                tone="neutral"
-                emphasis="low"
-                disabled={resolving}
-                onClick={onClear}
-              >
-                {labels.clear}
-              </Button>
-            ) : null}
             <Button
-              type="submit"
+              type="button"
               size="xs"
-              emphasis="medium"
-              loading={resolving}
-              disabled={url.trim().length === 0}
+              tone="neutral"
+              emphasis="low"
+              disabled={resolving}
+              onClick={onClear}
             >
-              {resolving ? labels.resolving : labels.resolve}
+              {labels.clear}
             </Button>
-          </Group>
-        </Stack>
-      </form>
+          ) : null}
+          <Button
+            type="button"
+            size="xs"
+            emphasis="medium"
+            loading={resolving}
+            disabled={resolving || url.trim().length === 0}
+            onClick={onResolve}
+          >
+            {resolving ? labels.resolving : labels.resolve}
+          </Button>
+        </Group>
+      </Stack>
 
       {converter}
     </Stack>
