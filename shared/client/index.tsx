@@ -96,6 +96,9 @@ function ToolRoot({
     const observer = new ResizeObserver(resize);
     observer.observe(document.getElementById("root")!);
     window.addEventListener("message", onMessage);
+    for (const origin of config.parentOrigins) {
+      window.parent.postMessage({ type: "geul:embed:ready" }, origin);
+    }
     return () => {
       observer.disconnect();
       window.removeEventListener("message", onMessage);
