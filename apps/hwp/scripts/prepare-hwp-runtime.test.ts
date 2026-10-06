@@ -14,7 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { prepareHwpRuntime } from "./prepare-hwp-runtime.mjs";
 
 const run = promisify(execFile);
-const basePath = "/vendors/rust-hwp-intl/0.1.0/";
+const basePath = "/vendors/rust-hwp-intl/0.2.1/";
 const sourceCommit = "1".repeat(40);
 let projectDirectory: string;
 let outputDirectory: string;
@@ -39,13 +39,22 @@ afterEach(async () => {
 
 async function fixture(
   complete = true,
-  buildId = "0.1.0",
+  buildId = "0.2.1",
   manifestBasePath = basePath,
   downstreamCommit = sourceCommit,
 ) {
   const source = resolve(projectDirectory, "fixture");
   await mkdir(resolve(source, "assets"), { recursive: true });
   await mkdir(resolve(source, "fonts"));
+  await mkdir(resolve(source, "component"));
+  await writeFile(
+    resolve(source, "component/index.js"),
+    "export const mount = () => {};\n",
+  );
+  await writeFile(
+    resolve(source, "component/styles.css"),
+    ":host { display: block; }\n",
+  );
   await writeFile(resolve(source, "index.html"), "<html>HWP editor</html>");
   await writeFile(resolve(source, "assets/runtime.js"), "export {};");
   await writeFile(resolve(source, "fonts/font.woff2"), "fixture-font");
@@ -70,7 +79,7 @@ async function fixture(
     resolve(packageDirectory, "package.json"),
     JSON.stringify({
       name: "rust-hwp-intl",
-      version: "0.1.0",
+      version: "0.2.1",
       exports: { "./studio.tar.gz": "./studio.tar.gz" },
     }),
   );
@@ -78,7 +87,7 @@ async function fixture(
   await run("tar", ["-czf", archive, "-C", source, "."]);
   const bytes = await readFile(archive);
   const descriptor = {
-    buildId: "0.1.0",
+    buildId: "0.2.1",
     basePath,
     source: "https://github.com/echovisionlab/rust-hwp-intl",
     sourceCommit,
@@ -131,9 +140,9 @@ describe("prepareHwpRuntime", () => {
   });
 
   it.each([
-    ["0.1.0-other", basePath, sourceCommit],
-    ["0.1.0", "/wrong-base/", sourceCommit],
-    ["0.1.0", basePath, "2".repeat(40)],
+    ["0.2.1-other", basePath, sourceCommit],
+    ["0.2.1", "/wrong-base/", sourceCommit],
+    ["0.2.1", basePath, "2".repeat(40)],
   ])(
     "rejects mismatched manifest pins %s %s %s",
     async (buildId, manifestBasePath, downstreamCommit) => {
@@ -169,6 +178,8 @@ describe("prepareHwpRuntime", () => {
     "THIRD_PARTY_LICENSES.md",
     "CanvasKit-LICENSE",
     "fonts/font.woff2",
+    "component/index.js",
+    "component/styles.css",
   ])("repairs missing required runtime file %s", async (file) => {
     const { descriptor } = await fixture();
     await prepareHwpRuntime({ projectDirectory, descriptor });
@@ -181,6 +192,24 @@ describe("prepareHwpRuntime", () => {
     ).toBeGreaterThan(0);
     await expectCleanTemporaryDirectory();
   });
+
+  it.each(["component/index.js", "component/styles.css"])(
+    "rejects a verified archive missing required DOM component file %s",
+    async (file) => {
+      const { descriptor, archive } = await fixture();
+      const source = resolve(projectDirectory, "fixture");
+      await rm(resolve(source, file));
+      await run("tar", ["-czf", archive, "-C", source, "."]);
+      descriptor.sha256 = createHash("sha256")
+        .update(await readFile(archive))
+        .digest("hex");
+      await expect(
+        prepareHwpRuntime({ projectDirectory, descriptor }),
+      ).rejects.toThrow();
+      await expectCleanTemporaryDirectory();
+      await expect(readdir(outputDirectory)).rejects.toThrow();
+    },
+  );
 
   it("rejects unfinished release pins before preparing assets", async () => {
     const { descriptor } = await fixture();

@@ -18,7 +18,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
-const basePath = "/vendors/rust-hwp-intl/0.1.0/";
+const basePath = "/vendors/rust-hwp-intl/0.2.1/";
 const markerName = ".prepared.json";
 
 async function checkReady(directory, runtime) {
@@ -28,6 +28,8 @@ async function checkReady(directory, runtime) {
     "THIRD_PARTY_LICENSES.md",
     "CanvasKit-LICENSE",
     "runtime-manifest.json",
+    "component/index.js",
+    "component/styles.css",
   ]) {
     const entry = await stat(resolve(directory, name));
     if (!entry.isFile() || entry.size === 0) {
