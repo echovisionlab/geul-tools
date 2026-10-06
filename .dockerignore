@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+apps/*/dist
+docs
+coverage
+*.log
+AGENTS.md
+AGENTS.override.md
+CLAUDE.md
+
+.artifacts
+apps/*/.artifacts
+.work

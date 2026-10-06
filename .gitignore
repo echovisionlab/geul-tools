@@ -1,0 +1,8 @@
+node_modules/
+apps/*/dist/
+apps/*/public/vendors/
+apps/*/.artifacts/
+.artifacts/
+AGENTS.md
+AGENTS.override.md
+CLAUDE.md

@@ -1,0 +1,35 @@
+packages:
+  - .
+  - tooling/*
+minimumReleaseAgeExclude:
+  - "@dsub/portadj@0.1.2"
+  - "@echovisionlab/audio-transcoder@0.2.1"
+  - "@echovisionlab/youtube-audio@0.1.7"
+  - "@mantine/core@9.7.0"
+  - "@mantine/dropzone@9.7.0"
+  - "@mantine/hooks@9.7.0"
+  - "@tabler/icons-react@3.49.0"
+  - "@tabler/icons@3.49.0"
+  - "@typescript-eslint/eslint-plugin@8.71.1"
+  - "@typescript-eslint/parser@8.71.1"
+  - "@typescript-eslint/project-service@8.71.1"
+  - "@typescript-eslint/scope-manager@8.71.1"
+  - "@typescript-eslint/tsconfig-utils@8.71.1"
+  - "@typescript-eslint/type-utils@8.71.1"
+  - "@typescript-eslint/types@8.71.1"
+  - "@typescript-eslint/typescript-estree@8.71.1"
+  - "@typescript-eslint/utils@8.71.1"
+  - "@typescript-eslint/visitor-keys@8.71.1"
+  - "@vitejs/plugin-react@6.1.2"
+  - mediabunny@1.61.3
+  - postcss@8.5.29
+  - rust-hwp-intl@0.1.0
+  - typescript-eslint@8.71.1
+  - vite@8.3.3
+onlyBuiltDependencies:
+  - esbuild
+
+catalogs:
+  eslint:
+    typescript-eslint-upstream: npm:typescript-eslint@8.71.1
+    typescript: npm:@typescript/typescript6@6.0.2
