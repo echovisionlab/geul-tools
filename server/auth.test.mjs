@@ -19,8 +19,12 @@ test("session validation forwards only the named cookie and rechecks every reque
       calls += 1;
       assert.equal(
         url.href,
-        "http://oathkeeper:4455/api.manage.v1.MemberService/GetCurrentSession",
+        "http://oathkeeper:4455/api/rpc/api.manage.v1.MemberService/GetCurrentSession",
       );
+      assert.equal(options.method, "POST");
+      assert.equal(options.headers["Content-Type"], "application/json");
+      assert.equal(options.headers["Connect-Protocol-Version"], "1");
+      assert.equal(options.body, "{}");
       assert.equal(options.headers.Cookie, "__Host-dsub-session=test-session");
       assert.equal(options.redirect, "error");
       return Response.json(

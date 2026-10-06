@@ -6,7 +6,7 @@ export function createAuthenticator({
   fetcher = fetch,
 }) {
   const endpoint = new URL(
-    "/api.manage.v1.MemberService/GetCurrentSession",
+    "/api/rpc/api.manage.v1.MemberService/GetCurrentSession",
     oathkeeperUrl,
   );
   return async function authenticateRequest(request) {
