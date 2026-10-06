@@ -1,131 +1,159 @@
 // @vitest-environment jsdom
-
 import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MantineProvider } from "@mantine/core";
-import { createEditor } from "rust-hwp-intl/editor";
+import { IntlProvider } from "use-intl";
+import { createStudioComponent } from "rust-hwp-intl/editor";
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HwpEditor } from "./HwpEditor";
 
-vi.mock("rust-hwp-intl/editor", () => ({ createEditor: vi.fn() }));
-
-type Editor = Awaited<ReturnType<typeof createEditor>>;
-
-function deferredEditor() {
-  let resolve!: (editor: Editor) => void;
+vi.mock("rust-hwp-intl/editor", () => ({ createStudioComponent: vi.fn() }));
+type Studio = Awaited<ReturnType<typeof createStudioComponent>>;
+function deferredStudio() {
+  let resolve!: (studio: Studio) => void;
   let reject!: (error: Error) => void;
-  const promise = new Promise<Editor>((resolvePromise, rejectPromise) => {
+  const promise = new Promise<Studio>((resolvePromise, rejectPromise) => {
     resolve = resolvePromise;
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
 }
-
 let container: HTMLDivElement;
 let root: Root;
-
 beforeEach(() => {
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    media: query,
-    matches: false,
-    onchange: null,
-    addListener() {},
-    removeListener() {},
-    addEventListener() {},
-    removeEventListener() {},
-    dispatchEvent: () => false,
-  }));
   container = document.createElement("div");
-  document.body.appendChild(container);
+  document.body.append(container);
   root = createRoot(container);
-  vi.mocked(createEditor).mockReset();
+  vi.mocked(createStudioComponent).mockReset();
 });
-
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
-
-function render(strict = false, label = "HWP / HWPX editor") {
+function render({
+  strict = false,
+  label = "HWP / HWPX editor",
+  locale = "en",
+  theme = "light",
+}: {
+  strict?: boolean;
+  label?: string;
+  locale?: string;
+  theme?: "light" | "dark";
+} = {}) {
   const tool = (
-    <MantineProvider>
-      <HwpEditor
-        labels={{
-          label,
-          loading: "Loading editor…",
-          error: "The editor could not be loaded. Try again.",
-          retry: "Try again",
-        }}
-      />
-    </MantineProvider>
+    <IntlProvider locale={locale} messages={{}}>
+      <MantineProvider forceColorScheme={theme}>
+        <HwpEditor
+          labels={{
+            label,
+            loading: "Loading editor…",
+            error: "The editor could not be loaded. Try again.",
+            retry: "Try again",
+          }}
+        />
+      </MantineProvider>
+    </IntlProvider>
   );
   act(() => root.render(strict ? <StrictMode>{tool}</StrictMode> : tool));
 }
-
-function installStartup(pending: ReturnType<typeof deferredEditor>) {
-  const iframe = document.createElement("iframe");
-  const destroy = vi.fn(() => iframe.remove());
-  const editor = { destroy } as unknown as Editor;
-  vi.mocked(createEditor).mockImplementationOnce((mount, options) => {
-    iframe.src = options!.studioUrl!;
-    (mount as HTMLElement).appendChild(iframe);
-    return pending.promise;
-  });
-  return { iframe, destroy, editor };
+function installStartup(pending: ReturnType<typeof deferredStudio>) {
+  const documentView = document.createElement("section");
+  documentView.dataset.studioDocument = "unsaved-work";
+  const destroy = vi.fn(() => documentView.remove());
+  const setAppearance = vi.fn();
+  const studio = { destroy, setAppearance } as unknown as Studio;
+  vi.mocked(createStudioComponent).mockImplementationOnce(
+    (mount: HTMLElement) => {
+      mount.append(documentView);
+      return pending.promise;
+    },
+  );
+  return { documentView, destroy, setAppearance, studio };
 }
 
-describe("HwpEditor lifecycle", () => {
-  it("mounts the same-origin editor once, reports readiness, and destroys it on navigation", async () => {
-    const pending = deferredEditor();
-    const { iframe, editor, destroy } = installStartup(pending);
-    render();
+describe("HwpEditor DOM lifecycle", () => {
+  it("starts the DOM studio in document scroll mode using tool-owned assets, without an iframe or height bridge", async () => {
+    const added = vi.spyOn(window, "addEventListener");
+    const pending = deferredStudio();
+    const startup = installStartup(pending);
+    render({ locale: "ko", theme: "dark" });
     expect(container.querySelector('[role="status"]')?.textContent).toContain(
       "Loading editor…",
     );
-    expect(
-      container
-        .querySelector<HTMLElement>("[aria-busy]")!
-        .style.getPropertyValue("--hwp-editor-height"),
-    ).toBe("");
-    expect(iframe.src).toBe(
-      new URL(
-        "/vendors/rust-hwp-intl/0.1.0/index.html?scroll=page",
-        window.location.origin,
-      ).href,
+    expect(createStudioComponent).toHaveBeenCalledExactlyOnceWith(
+      expect.any(HTMLElement),
+      {
+        studioUrl: expect.stringMatching(
+          /\/vendors\/rust-hwp-intl\/0\.2\.1\/index\.html$/,
+        ),
+        locale: "ko",
+        theme: "dark",
+        scrollMode: "document",
+      },
     );
-    expect(iframe.title).toBe("HWP / HWPX editor");
-
-    await act(async () => pending.resolve(editor));
+    expect(container.querySelector("iframe")).toBeNull();
+    expect(
+      added.mock.calls.filter(([type]) => type === "message"),
+    ).toHaveLength(0);
+    expect(
+      container.querySelector<HTMLElement>("[data-hwp-editor-mount]")!.style
+        .height,
+    ).toBe("");
+    await act(async () => pending.resolve(startup.studio));
     expect(container.querySelector('[role="status"]')).toBeNull();
-    render();
-    expect(createEditor).toHaveBeenCalledOnce();
-    expect(iframe.isConnected).toBe(true);
-
+    expect(container.querySelector('[data-status="ready"]')).not.toBeNull();
+    expect(startup.setAppearance).toHaveBeenLastCalledWith({
+      locale: "ko",
+      theme: "dark",
+    });
     act(() => root.render(null));
-    expect(destroy).toHaveBeenCalledOnce();
-    expect(iframe.isConnected).toBe(false);
+    expect(startup.destroy).toHaveBeenCalledOnce();
+    expect(startup.documentView.isConnected).toBe(false);
   });
 
-  it("updates the accessible title without recreating an active editor", async () => {
-    const pending = deferredEditor();
-    const { iframe, editor, destroy } = installStartup(pending);
+  it("updates locale, theme and accessible label without recreating the studio or losing unsaved work", async () => {
+    const pending = deferredStudio();
+    const startup = installStartup(pending);
     render();
-    await act(async () => pending.resolve(editor));
-    iframe.dataset.document = "unsaved-work";
-    render(false, "Updated editor label");
-    expect(iframe.title).toBe("Updated editor label");
-    expect(container.querySelector("iframe")).toBe(iframe);
-    expect(iframe.dataset.document).toBe("unsaved-work");
-    expect(createEditor).toHaveBeenCalledOnce();
-    expect(destroy).not.toHaveBeenCalled();
+    await act(async () => pending.resolve(startup.studio));
+    render({ locale: "ja", theme: "dark", label: "Updated editor label" });
+    expect(startup.setAppearance).toHaveBeenLastCalledWith({
+      locale: "ja",
+      theme: "dark",
+    });
+    expect(createStudioComponent).toHaveBeenCalledOnce();
+    expect(
+      container.querySelector('[aria-label="Updated editor label"]'),
+    ).not.toBeNull();
+    expect(container.querySelector("[data-studio-document]")).toBe(
+      startup.documentView,
+    );
+    expect(startup.documentView.dataset.studioDocument).toBe("unsaved-work");
+    expect(startup.destroy).not.toHaveBeenCalled();
   });
 
-  it("shows a localized startup error and retries in a fresh mount without exposing internal errors", async () => {
-    const failed = deferredEditor();
+  it("applies the latest appearance when startup resolves after an update", async () => {
+    const pending = deferredStudio();
+    const startup = installStartup(pending);
+    render({ locale: "en" });
+    render({ locale: "ko", theme: "dark" });
+    await act(async () => pending.resolve(startup.studio));
+    expect(startup.setAppearance).toHaveBeenLastCalledWith({
+      locale: "ko",
+      theme: "dark",
+    });
+    expect(createStudioComponent).toHaveBeenCalledOnce();
+  });
+
+  it("shows localized startup failure and retries in a fresh owned mount", async () => {
+    const failed = deferredStudio();
     installStartup(failed);
     render();
+    const failedMount = vi.mocked(createStudioComponent).mock.calls[0]![0];
     await act(async () =>
       failed.reject(new Error("internal transport failure")),
     );
@@ -133,136 +161,66 @@ describe("HwpEditor lifecycle", () => {
       "The editor could not be loaded. Try again.",
     );
     expect(container.textContent).not.toContain("internal transport failure");
-    expect(container.querySelector("iframe")).toBeNull();
-
-    const pending = deferredEditor();
-    const { editor, iframe } = installStartup(pending);
+    expect(container.querySelector("[data-studio-document]")).toBeNull();
+    const pending = deferredStudio();
+    const startup = installStartup(pending);
     act(() => container.querySelector<HTMLButtonElement>("button")!.click());
-    expect(createEditor).toHaveBeenCalledTimes(2);
+    expect(createStudioComponent).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(createStudioComponent).mock.calls[1]![0]).not.toBe(
+      failedMount,
+    );
     expect(container.querySelector('[role="status"]')).not.toBeNull();
-    await act(async () => pending.resolve(editor));
-    expect(container.querySelector("iframe")).toBe(iframe);
+    await act(async () => pending.resolve(startup.studio));
+    expect(container.querySelector("[data-studio-document]")).toBe(
+      startup.documentView,
+    );
     expect(container.querySelector("button")).toBeNull();
   });
 
-  it("accepts document height only from its same-origin frame and supports document shrink", async () => {
-    const pending = deferredEditor();
-    const { iframe, editor } = installStartup(pending);
+  it("destroys a late-ready studio after navigation without reattaching its owned mount", async () => {
+    const pending = deferredStudio();
+    const startup = installStartup(pending);
     render();
-    await act(async () => pending.resolve(editor));
-    const host = container.querySelector<HTMLElement>(
-      "[aria-label][aria-busy]",
-    )!;
-    const send = (
-      height: unknown,
-      origin = window.location.origin,
-      source = iframe.contentWindow,
-    ) => {
-      act(() => {
-        window.dispatchEvent(
-          new MessageEvent("message", {
-            origin,
-            source,
-            data: { type: "rhwp:content-height", height },
-          }),
-        );
-      });
-    };
-    send(4800);
-    expect(host.style.getPropertyValue("--hwp-editor-height")).toBe("4800px");
-    send(9000, "https://other.example");
-    send(9000, window.location.origin, window);
-    for (const invalid of [0, -1, Infinity, NaN, "9000"]) {
-      send(invalid);
-    }
-    expect(host.style.getPropertyValue("--hwp-editor-height")).toBe("4800px");
-    send(400);
-    expect(host.style.getPropertyValue("--hwp-editor-height")).toBe("400px");
-  });
-
-  it("removes height listeners on failure, retry, and unmount and ignores disposed callbacks", async () => {
-    const added = vi.spyOn(window, "addEventListener");
-    const removed = vi.spyOn(window, "removeEventListener");
-    const first = deferredEditor();
-    const firstStartup = installStartup(first);
-    render();
-    const firstListener = added.mock.calls.find(
-      ([type]) => type === "message",
-    )![1] as EventListener;
-    const firstMessage = new MessageEvent("message", {
-      origin: window.location.origin,
-      source: firstStartup.iframe.contentWindow,
-      data: { type: "rhwp:content-height", height: 4200 },
-    });
-    act(() => window.dispatchEvent(firstMessage));
-    expect(
-      container
-        .querySelector<HTMLElement>("[aria-busy]")!
-        .style.getPropertyValue("--hwp-editor-height"),
-    ).toBe("4200px");
-    await act(async () => first.reject(new Error("failed")));
-    expect(removed).toHaveBeenCalledWith("message", firstListener);
-    expect(
-      container
-        .querySelector<HTMLElement>("[aria-busy]")!
-        .style.getPropertyValue("--hwp-editor-height"),
-    ).toBe("");
-
-    const second = deferredEditor();
-    const secondStartup = installStartup(second);
-    act(() => container.querySelector<HTMLButtonElement>("button")!.click());
-    act(() => firstListener(firstMessage));
-    expect(
-      container
-        .querySelector<HTMLElement>("[aria-busy]")!
-        .style.getPropertyValue("--hwp-editor-height"),
-    ).toBe("");
-    const listeners = added.mock.calls.filter(([type]) => type === "message");
-    const secondListener = listeners[listeners.length - 1][1] as EventListener;
-    const secondMessage = new MessageEvent("message", {
-      origin: window.location.origin,
-      source: secondStartup.iframe.contentWindow,
-      data: { type: "rhwp:content-height", height: 1700 },
-    });
-    act(() => window.dispatchEvent(secondMessage));
-    expect(
-      container
-        .querySelector<HTMLElement>("[aria-busy]")!
-        .style.getPropertyValue("--hwp-editor-height"),
-    ).toBe("1700px");
     act(() => root.render(null));
-    expect(removed).toHaveBeenCalledWith("message", secondListener);
-    act(() => secondListener(secondMessage));
+    expect(startup.documentView.isConnected).toBe(false);
+    await act(async () => pending.resolve(startup.studio));
+    expect(startup.destroy).toHaveBeenCalledOnce();
+    expect(startup.setAppearance).not.toHaveBeenCalled();
     expect(container.childElementCount).toBe(0);
   });
 
-  it("destroys a late-ready editor after unmount", async () => {
-    const pending = deferredEditor();
-    const { editor, iframe, destroy } = installStartup(pending);
-    render();
-    act(() => root.render(null));
-    expect(iframe.isConnected).toBe(false);
-    await act(async () => pending.resolve(editor));
-    expect(destroy).toHaveBeenCalledOnce();
-    expect(container.childElementCount).toBe(0);
-  });
-
-  it("isolates StrictMode startup cleanup so the old editor cannot remove the active editor", async () => {
-    const old = deferredEditor();
-    const current = deferredEditor();
+  it("isolates StrictMode startup cleanup so an old studio cannot remove the active document", async () => {
+    const old = deferredStudio();
+    const current = deferredStudio();
     const oldStartup = installStartup(old);
     const currentStartup = installStartup(current);
-    render(true);
-    expect(createEditor).toHaveBeenCalledTimes(2);
-    expect(oldStartup.iframe.isConnected).toBe(false);
-    expect(currentStartup.iframe.isConnected).toBe(true);
-
-    await act(async () => old.resolve(oldStartup.editor));
+    render({ strict: true });
+    expect(createStudioComponent).toHaveBeenCalledTimes(2);
+    expect(oldStartup.documentView.isConnected).toBe(false);
+    expect(currentStartup.documentView.isConnected).toBe(true);
+    await act(async () => old.resolve(oldStartup.studio));
     expect(oldStartup.destroy).toHaveBeenCalledOnce();
     expect(container.querySelector('[role="status"]')).not.toBeNull();
-    await act(async () => current.resolve(currentStartup.editor));
+    await act(async () => current.resolve(currentStartup.studio));
     expect(currentStartup.destroy).not.toHaveBeenCalled();
-    expect(container.querySelector("iframe")).toBe(currentStartup.iframe);
+    expect(container.querySelector("[data-studio-document]")).toBe(
+      currentStartup.documentView,
+    );
     expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it("keeps ready documents in natural DOM flow and limits placeholder minimum height to pending/error content", () => {
+    const css = readFileSync(
+      "apps/hwp/src/ui/HwpEditorView.module.css",
+      "utf8",
+    );
+    expect(css).not.toMatch(/(?:^|[;{])\s*height\s*:/);
+    expect(css).not.toMatch(/overflow\s*:\s*hidden|iframe|--hwp-editor-height/);
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]+)\}/g)];
+    const minimumHeightRules = rules.filter((rule) =>
+      /min-height\s*:/.test(rule[2]!),
+    );
+    expect(minimumHeightRules).toHaveLength(1);
+    expect(minimumHeightRules[0]![1]!.trim()).toBe(".status");
   });
 });

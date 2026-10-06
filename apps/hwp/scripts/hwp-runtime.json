@@ -1,10 +1,10 @@
 {
-  "buildId": "0.1.0",
-  "basePath": "/vendors/rust-hwp-intl/0.1.0/",
+  "buildId": "0.2.1",
+  "basePath": "/vendors/rust-hwp-intl/0.2.1/",
   "source": "https://github.com/echovisionlab/rust-hwp-intl",
   "archivePackage": "rust-hwp-intl",
   "archivePath": "studio.tar.gz",
-  "sha256": "9a3de159b9968c52efc4c1d045fb128300d9e5941ddfa2cea8cfb9c3103e654d",
-  "sourceCommit": "ef80a0ff15f9fa90786a7258f6b2cfcd127e9c59",
+  "sha256": "4375716fa2807eaa2ab27d6fa23ae100affeb510adfbe5cdb4c5804c26236aba",
+  "sourceCommit": "d6ee4c1b1b314993760171dd19b351ba812a2319",
   "upstreamCommit": "e8800c8def63449808a4092798442652ed460552"
 }
