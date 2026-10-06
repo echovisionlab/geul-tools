@@ -2,11 +2,7 @@
   position: relative;
   flex: 0 0 auto;
   min-width: 0;
-  height: max(
-    var(--hwp-editor-height, 0px),
-    720px,
-    calc(100dvh - var(--mantine-spacing-md) * 2)
-  );
+  height: var(--hwp-editor-height, 720px);
   overflow: hidden;
   border: 1px solid var(--mantine-color-default-border);
 }

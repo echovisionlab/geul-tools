@@ -84,6 +84,11 @@ describe("HwpEditor lifecycle", () => {
     expect(container.querySelector('[role="status"]')?.textContent).toContain(
       "Loading editor…",
     );
+    expect(
+      container
+        .querySelector<HTMLElement>("[aria-busy]")!
+        .style.getPropertyValue("--hwp-editor-height"),
+    ).toBe("");
     expect(iframe.src).toBe(
       new URL(
         "/vendors/rust-hwp-intl/0.1.0/index.html?scroll=page",
@@ -171,8 +176,8 @@ describe("HwpEditor lifecycle", () => {
       send(invalid);
     }
     expect(host.style.getPropertyValue("--hwp-editor-height")).toBe("4800px");
-    send(800);
-    expect(host.style.getPropertyValue("--hwp-editor-height")).toBe("800px");
+    send(400);
+    expect(host.style.getPropertyValue("--hwp-editor-height")).toBe("400px");
   });
 
   it("removes height listeners on failure, retry, and unmount and ignores disposed callbacks", async () => {
@@ -201,7 +206,7 @@ describe("HwpEditor lifecycle", () => {
       container
         .querySelector<HTMLElement>("[aria-busy]")!
         .style.getPropertyValue("--hwp-editor-height"),
-    ).toBe("0px");
+    ).toBe("");
 
     const second = deferredEditor();
     const secondStartup = installStartup(second);
@@ -211,7 +216,7 @@ describe("HwpEditor lifecycle", () => {
       container
         .querySelector<HTMLElement>("[aria-busy]")!
         .style.getPropertyValue("--hwp-editor-height"),
-    ).toBe("0px");
+    ).toBe("");
     const listeners = added.mock.calls.filter(([type]) => type === "message");
     const secondListener = listeners[listeners.length - 1][1] as EventListener;
     const secondMessage = new MessageEvent("message", {
