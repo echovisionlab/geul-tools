@@ -589,6 +589,45 @@ describe("createAudioTranscoderRuntime", () => {
   });
 });
 
+describe("runtime-owned Worker bootstrap cleanup", () => {
+  it.each([false, true])(
+    "releases pending cross-origin bootstraps after pool disposal (pool fails: %s)",
+    async (fails) => {
+      const poolFailure = new Error("Pool disposal failed");
+      const harness = createHarness(
+        fails ? { poolDisposeError: poolFailure } : {},
+      );
+      const terminate = vi.fn();
+      vi.stubGlobal("window", { location: { origin: "https://www.dsub.io" } });
+      vi.stubGlobal(
+        "Worker",
+        class extends EventTarget {
+          terminate = terminate;
+        },
+      );
+      try {
+        const runtime = createAudioTranscoderRuntime({
+          dependencies: harness.dependencies,
+          pageHideTarget: null,
+        });
+        runtime.getQueueSnapshot();
+        const worker = harness.createPool.mock.calls[0][0].workerFactory!(0);
+        worker.terminate();
+        expect(harness.revokeObjectURL).not.toHaveBeenCalled();
+        if (fails) await expect(runtime.dispose()).rejects.toBe(poolFailure);
+        else await expect(runtime.dispose()).resolves.toBeUndefined();
+        expect(harness.disposePool).toHaveBeenCalledOnce();
+        expect(harness.revokeObjectURL).toHaveBeenCalledExactlyOnceWith(
+          "blob:audio-output",
+        );
+        expect(harness.disposeOutputSession).toHaveBeenCalledOnce();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    },
+  );
+});
+
 interface HarnessOptions {
   readonly discardError?: Error;
   readonly discardFailures?: number;

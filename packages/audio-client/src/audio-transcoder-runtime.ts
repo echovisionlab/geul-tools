@@ -25,6 +25,7 @@ import {
   type RuntimeAssetLoadState,
   type RuntimeAssetSource,
 } from "@echovisionlab/audio-transcoder";
+import workerAssetUrl from "./audio-transcoder.worker.ts?worker&url";
 import { readErrorProperty } from "./error-diagnostics";
 
 export const AUDIO_TRANSCODER_FILE_CAPACITY = 10;
@@ -37,7 +38,7 @@ export const AUDIO_TRANSCODER_OUTPUT_NAMESPACE = "audio-tools-transcode";
 export const AUDIO_TRANSCODER_PROBE_DEADLINE_MS = 15_000;
 
 export interface AudioTranscoderInputSource {
-  /** Consumer-owned same-origin endpoint for streaming the unmodified source. */
+  /** Consumer-owned endpoint for streaming the unmodified source. */
   readonly downloadUrl?: string;
   readonly input: AudioStreamInput;
   readonly name: string;
@@ -143,6 +144,12 @@ export function createAudioTranscoderRuntime(
   options: CreateAudioTranscoderRuntimeOptions = {},
 ): AudioTranscoderRuntime {
   const dependencies = resolveDependencies(options.dependencies);
+  const workerUrl = new URL(workerAssetUrl, import.meta.url);
+  const workers = createAudioTranscoderWorkerFactory(
+    workerUrl,
+    dependencies.objectUrl,
+    typeof window === "undefined" ? workerUrl.origin : window.location.origin,
+  );
   const pageHideTarget =
     options.pageHideTarget === undefined
       ? resolveWindow()
@@ -178,7 +185,7 @@ export function createAudioTranscoderRuntime(
         },
         concurrency: AUDIO_TRANSCODER_POOL_CONCURRENCY,
         maxQueued: AUDIO_TRANSCODER_POOL_MAX_QUEUED,
-        workerFactory: createAudioTranscoderWorker,
+        workerFactory: workers.create,
       }),
     };
     return resources;
@@ -194,6 +201,7 @@ export function createAudioTranscoderRuntime(
     const ownedResources = resources;
     disposal = (async () => {
       if (ownedResources === undefined) {
+        workers.dispose();
         return;
       }
 
@@ -202,6 +210,8 @@ export function createAudioTranscoderRuntime(
         await ownedResources.pool.dispose();
       } catch (error) {
         failures.push(error);
+      } finally {
+        workers.dispose();
       }
 
       const artifactSettlements = await Promise.allSettled(
@@ -474,11 +484,51 @@ function resolveWindow(): AudioTranscoderPageHideTarget | null {
   return typeof window === "undefined" ? null : window;
 }
 
-function createAudioTranscoderWorker(): Worker {
-  return new Worker(new URL("./audio-transcoder.worker.ts", import.meta.url), {
+/** Owns only cross-origin module bootstrap URLs; the pool owns native Workers. */
+export function createAudioTranscoderWorkerFactory(
+  workerUrl: URL,
+  objectUrl: AudioTranscoderObjectUrlApi,
+  pageOrigin: string,
+) {
+  const pendingBootstraps = new Set<string>();
+  const workerOptions: WorkerOptions = {
     name: "audio-transcoder",
     type: "module",
-  });
+  };
+  return {
+    create(): Worker {
+      if (workerUrl.origin === pageOrigin)
+        return new Worker(workerUrl, workerOptions);
+      const bootstrapUrl = objectUrl.createObjectURL(
+        new Blob([`import ${JSON.stringify(workerUrl.href)};`], {
+          type: "text/javascript",
+        }),
+      );
+      pendingBootstraps.add(bootstrapUrl);
+      let worker: Worker;
+      const release = () => {
+        if (pendingBootstraps.delete(bootstrapUrl))
+          objectUrl.revokeObjectURL(bootstrapUrl);
+        worker?.removeEventListener("message", release);
+        worker?.removeEventListener("error", release);
+        worker?.removeEventListener("messageerror", release);
+      };
+      try {
+        worker = new Worker(bootstrapUrl, workerOptions);
+        worker.addEventListener("message", release);
+        worker.addEventListener("error", release);
+        worker.addEventListener("messageerror", release);
+        return worker;
+      } catch (error) {
+        release();
+        throw error;
+      }
+    },
+    dispose() {
+      for (const url of pendingBootstraps) objectUrl.revokeObjectURL(url);
+      pendingBootstraps.clear();
+    },
+  };
 }
 
 function resolveProbeDeadline(value: number | undefined): number {

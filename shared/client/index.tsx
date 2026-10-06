@@ -13,37 +13,18 @@ import "@mantine/core/styles.css";
 import "@mantine/dropzone/styles.css";
 import "../styles/global.css";
 
-export type ToolId = "transcode" | "youtube-audio" | "hwp" | "portadj";
-export interface ToolRuntimeConfig {
-  tool: ToolId;
-  parentOrigins: string[];
-  fontCdnOrigin?: string;
-  apiOrigin?: string;
-}
-declare global {
-  interface Window {
-    __GEUL_TOOL_CONFIG__: ToolRuntimeConfig;
-  }
-}
+import {
+  ToolRuntimeProvider,
+  applyToolLocale,
+  toolFontUrl,
+  type ToolId,
+  type ToolRuntimeConfig,
+} from "./runtime-context";
+export type { ToolId, ToolRuntimeConfig } from "./runtime-context";
 const messages = import.meta.glob("../messages/*.json", {
   eager: true,
   import: "default",
 }) as Record<string, Record<string, unknown>>;
-const fontProfiles: Record<string, string> = {
-  ko: "korean",
-  ja: "japanese",
-  "zh-CN": "chinese-simplified",
-  "zh-TW": "chinese-traditional",
-  ar: "arabic",
-};
-const fontFamilies: Record<string, string> = {
-  ko: "Noto+Sans+KR:wght@100..900",
-  ja: "Noto+Sans+JP:wght@100..900",
-  "zh-CN": "Noto+Sans+SC:wght@100..900",
-  "zh-TW": "Noto+Sans+TC:wght@100..900",
-  ar: "Noto+Sans+Arabic:wght@100..900",
-};
-
 function ToolRoot({
   render,
   config,
@@ -62,19 +43,10 @@ function ToolRoot({
   }));
   const parentOrigin = useRef<string | null>(null);
   useEffect(() => {
-    document.documentElement.lang = settings.locale;
-    document.documentElement.dir = settings.locale === "ar" ? "rtl" : "ltr";
-    document.documentElement.dataset.fontProfile =
-      fontProfiles[settings.locale] ?? "latin";
+    applyToolLocale(document.documentElement, settings.locale);
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    const families = [
-      "Noto+Sans:wght@100..900",
-      ...(fontFamilies[settings.locale] ? [fontFamilies[settings.locale]] : []),
-      "Noto+Sans+Mono:wght@100..900",
-      "Noto+Color+Emoji",
-    ];
-    link.href = `${config.fontCdnOrigin ?? "https://cdn.dsub.io"}/fonts/css2?${families.map((family) => `family=${family}`).join("&")}&display=swap`;
+    link.href = toolFontUrl(config, settings.locale);
     document.head.append(link);
     return () => link.remove();
   }, [config.fontCdnOrigin, settings.locale]);
@@ -96,24 +68,29 @@ function ToolRoot({
     const observer = new ResizeObserver(resize);
     observer.observe(document.getElementById("root")!);
     window.addEventListener("message", onMessage);
+    for (const origin of config.parentOrigins) {
+      window.parent.postMessage({ type: "geul:embed:ready" }, origin);
+    }
     return () => {
       observer.disconnect();
       window.removeEventListener("message", onMessage);
     };
   }, [config.parentOrigins]);
   return (
-    <IntlProvider
-      locale={settings.locale}
-      messages={messages[`../messages/${settings.locale}.json`]}
-    >
-      <MantineProvider
-        theme={theme}
-        forceColorScheme={settings.colorScheme}
-        deduplicateInlineStyles
+    <ToolRuntimeProvider config={config}>
+      <IntlProvider
+        locale={settings.locale}
+        messages={messages[`../messages/${settings.locale}.json`]}
       >
-        {render()}
-      </MantineProvider>
-    </IntlProvider>
+        <MantineProvider
+          theme={theme}
+          forceColorScheme={settings.colorScheme}
+          deduplicateInlineStyles
+        >
+          {render()}
+        </MantineProvider>
+      </IntlProvider>
+    </ToolRuntimeProvider>
   );
 }
 

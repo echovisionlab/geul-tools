@@ -3,10 +3,10 @@ export async function downloadOriginalAudio(
   url: string,
   name: string,
   signal: AbortSignal,
+  apiOrigin?: string,
 ): Promise<"started" | "expired" | "failed"> {
   const source = new URL(url, window.location.href);
   const sameOrigin = source.origin === window.location.origin;
-  const apiOrigin = window.__GEUL_TOOL_CONFIG__?.apiOrigin;
   if (!sameOrigin && source.origin !== apiOrigin) {
     return "failed";
   }

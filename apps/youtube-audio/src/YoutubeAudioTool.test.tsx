@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { IntlProvider } from "use-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ToolRuntimeProvider } from "@/shared/client/runtime-context";
 import enMessages from "@/shared/messages/en.json";
 import type { AudioTranscodeToolProps } from "@/audio-client/AudioTranscodeTool";
 import type { YoutubeAudioToolViewProps } from "./ui";
@@ -19,14 +20,37 @@ let transcodeProps: AudioTranscodeToolProps | null = null;
 vi.mock("./ui", () => ({
   YoutubeAudioToolView: (props: YoutubeAudioToolViewProps) => {
     viewProps = props;
-    return <div data-youtube-audio-view>{props.converter}</div>;
+    return (
+      <div data-youtube-audio-view>
+        <button
+          data-source-input
+          onClick={() => props.onUrlChange("https://youtu.be/abcdefghijk")}
+        >
+          Set URL
+        </button>
+        <button data-resolve onClick={props.onResolve}>
+          Load
+        </button>
+        {props.converter}
+      </div>
+    );
   },
 }));
 
 vi.mock("@/audio-client/AudioTranscodeTool", () => ({
   AudioTranscodeTool: (props: AudioTranscodeToolProps) => {
     transcodeProps = props;
-    return <div data-audio-transcoder />;
+    return (
+      <div
+        data-audio-transcoder
+        data-http-url={
+          props.externalSource && "http" in props.externalSource.input
+            ? props.externalSource.input.http?.url
+            : undefined
+        }
+        data-download-url={props.externalSource?.downloadUrl}
+      />
+    );
   },
 }));
 
@@ -60,15 +84,18 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  delete (window as Partial<Window>).__GEUL_TOOL_CONFIG__;
   vi.clearAllMocks();
 });
 
-function render(fetcher: typeof fetch) {
+function render(fetcher: typeof fetch, apiOrigin?: string) {
   act(() => {
     root.render(
       <IntlProvider locale="en" messages={enMessages}>
-        <YoutubeAudioTool fetcher={fetcher} />
+        <ToolRuntimeProvider
+          config={{ tool: "youtube-audio", parentOrigins: [], apiOrigin }}
+        >
+          <YoutubeAudioTool fetcher={fetcher} />
+        </ToolRuntimeProvider>
       </IntlProvider>,
     );
   });
@@ -149,11 +176,6 @@ describe("YoutubeAudioTool", () => {
 
   it("sends resolve, source inspection, original download, and revoke through the credentialed configured API origin", async () => {
     const apiOrigin = "https://www.dsub.io";
-    window.__GEUL_TOOL_CONFIG__ = {
-      tool: "youtube-audio",
-      parentOrigins: [],
-      apiOrigin,
-    };
     const relative = {
       ...resolved,
       input: {
@@ -170,7 +192,7 @@ describe("YoutubeAudioTool", () => {
         new Response(JSON.stringify(relative), { status: 200 }),
       )
       .mockResolvedValue(new Response(null, { status: 204 }));
-    render(fetcher);
+    render(fetcher, apiOrigin);
     act(() => props().onUrlChange("https://youtu.be/abcdefghijk"));
     await act(async () => props().onResolve());
     await vi.waitFor(() => expect(props().resolvedTitle).toBe("Reference"));
@@ -194,6 +216,92 @@ describe("YoutubeAudioTool", () => {
       `${apiOrigin}${relative.input.http.url}`,
       expect.objectContaining({ credentials: "include", method: "DELETE" }),
     );
+  });
+
+  it("keeps API origins isolated between concurrently mounted tool instances", async () => {
+    const relative = {
+      ...resolved,
+      input: {
+        ...resolved.input,
+        http: {
+          ...resolved.input.http,
+          url: `/api/tools/youtube-audio/sources/${resolved.sourceId}`,
+        },
+      },
+    };
+    const remoteFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => new Response(JSON.stringify(relative)));
+    const localFetch = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => new Response(JSON.stringify(relative)));
+    act(() =>
+      root.render(
+        <IntlProvider locale="en" messages={enMessages}>
+          <ToolRuntimeProvider
+            config={{
+              tool: "youtube-audio",
+              parentOrigins: [],
+              apiOrigin: "https://www.dsub.io",
+            }}
+          >
+            <div data-instance="remote">
+              <YoutubeAudioTool fetcher={remoteFetch} />
+            </div>
+          </ToolRuntimeProvider>
+          <ToolRuntimeProvider
+            config={{
+              tool: "youtube-audio",
+              parentOrigins: [],
+              apiOrigin: window.location.origin,
+            }}
+          >
+            <div data-instance="local">
+              <YoutubeAudioTool fetcher={localFetch} />
+            </div>
+          </ToolRuntimeProvider>
+        </IntlProvider>,
+      ),
+    );
+    for (const name of ["remote", "local"]) {
+      const instance = container.querySelector(`[data-instance="${name}"]`)!;
+      act(() =>
+        instance
+          .querySelector<HTMLButtonElement>("[data-source-input]")!
+          .click(),
+      );
+      await act(async () =>
+        instance.querySelector<HTMLButtonElement>("[data-resolve]")!.click(),
+      );
+    }
+    await vi.waitFor(() =>
+      expect(
+        container.querySelectorAll("[data-audio-transcoder]"),
+      ).toHaveLength(2),
+    );
+    expect(remoteFetch).toHaveBeenCalledWith(
+      "https://www.dsub.io/api/tools/youtube-audio/resolve",
+      expect.objectContaining({ credentials: "include" }),
+    );
+    expect(localFetch).toHaveBeenCalledWith(
+      "/api/tools/youtube-audio/resolve",
+      expect.objectContaining({ credentials: "include" }),
+    );
+    expect(
+      container
+        .querySelector('[data-instance="remote"] [data-audio-transcoder]')
+        ?.getAttribute("data-http-url"),
+    ).toBe(`https://www.dsub.io${relative.input.http.url}`);
+    expect(
+      container
+        .querySelector('[data-instance="local"] [data-audio-transcoder]')
+        ?.getAttribute("data-http-url"),
+    ).toBe(`${window.location.origin}${relative.input.http.url}`);
+    expect(
+      container
+        .querySelector('[data-instance="remote"] [data-audio-transcoder]')
+        ?.getAttribute("data-download-url"),
+    ).toBe(`https://www.dsub.io${relative.input.http.url}?download=1`);
   });
 
   it("localizes missing authentication and keeps the converter closed", async () => {
