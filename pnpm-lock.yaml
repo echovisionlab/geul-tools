@@ -245,8 +245,8 @@ importers:
   .:
     dependencies:
       "@dsub/portadj":
-        specifier: 0.1.4
-        version: 0.1.4(react@19.3.0)
+        specifier: 0.1.5
+        version: 0.1.5(react@19.3.0)
       "@echovisionlab/audio-transcoder":
         specifier: 0.2.1
         version: 0.2.1
@@ -433,10 +433,10 @@ packages:
       }
     engines: { node: ">=20.19.0" }
 
-  "@dsub/portadj@0.1.4":
+  "@dsub/portadj@0.1.5":
     resolution:
       {
-        integrity: sha512-EdA1Xkpb/MfSlLZ1Vp+tFFckcnYQhEC1gW4CH1/P5vYZj4wvALY/0KufRohUWEbp1eEqdNmxivxmUuYp3fjAVg==,
+        integrity: sha512-6Odvuc+K7s1WsFWq0UYw1HvYml0aLIPwssvUxsGCSmBNteAxnVjGKEwHu762QYVwstetyQRvDTFjwMPYAQhykg==,
       }
     engines: { node: ">=22" }
     peerDependencies:
@@ -2621,7 +2621,7 @@ snapshots:
 
   "@csstools/css-tokenizer@4.0.2": {}
 
-  "@dsub/portadj@0.1.4(react@19.3.0)":
+  "@dsub/portadj@0.1.5(react@19.3.0)":
     optionalDependencies:
       react: 19.3.0
 
