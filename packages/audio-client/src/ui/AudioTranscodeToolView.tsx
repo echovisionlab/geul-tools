@@ -250,7 +250,7 @@ function FileRow({
     >
       {divided ? <Divider /> : null}
       <Flex
-        p="md"
+        p={0}
         gap="md"
         align={{ base: "stretch", sm: "flex-start" }}
         direction={{ base: "column", sm: "row" }}
@@ -426,6 +426,7 @@ export function AudioTranscodeToolView({
 
       <SectionCard
         component="section"
+        p={0}
         aria-labelledby={`${titleId}-settings-title`}
       >
         <Stack gap="md">
@@ -521,7 +522,7 @@ export function AudioTranscodeToolView({
         aria-labelledby={`${titleId}-queue-title`}
       >
         <Stack gap={0}>
-          <Stack p="md" gap="md">
+          <Stack p={0} gap="md">
             <SectionHeader
               title={<span id={`${titleId}-queue-title`}>{labels.queue}</span>}
               actions={
