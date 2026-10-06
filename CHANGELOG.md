@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/echovisionlab/geul-tools/compare/v0.2.1...v0.3.0) (2026-10-06)
+
+
+### Features
+
+* **hwp:** mount the studio directly in embedded pages ([#14](https://github.com/echovisionlab/geul-tools/issues/14)) ([743f3f0](https://github.com/echovisionlab/geul-tools/commit/743f3f0bc3fc574f3b000c1358c9228952c563f0))
+
 ## [0.2.1](https://github.com/echovisionlab/geul-tools/compare/v0.2.0...v0.2.1) (2026-10-06)
 
 
