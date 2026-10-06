@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.3](https://github.com/echovisionlab/geul-tools/compare/v0.1.2...v0.1.3) (2026-10-06)
+
+
+### Bug Fixes
+
+* **hwp:** size embedded editor from document content ([37e6f74](https://github.com/echovisionlab/geul-tools/commit/37e6f746c9a466fd8d204e6735e766a8e77a710d))
+* **hwp:** size embedded editor from document content ([e480982](https://github.com/echovisionlab/geul-tools/commit/e48098248e5611c41e54452259aeafcb7fcc0fcb))
+
 ## [0.1.2](https://github.com/echovisionlab/geul-tools/compare/v0.1.1...v0.1.2) (2026-10-06)
 
 
